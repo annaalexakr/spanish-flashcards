@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Spanish Flashcards</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f0f4f8;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* ── HEADER ── */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 14px 20px 12px;
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            z-index: 10;
+        }
+
+        .header-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #6366f1;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .progress-bar {
+            height: 5px;
+            background: #e2e8f0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #6366f1, #8b5cf6);
+            border-radius: 3px;
+            transition: width 0.4s ease;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: #94a3b8;
+        }
+
+        .stat-known  { color: #22c55e; font-weight: 700; }
+        .stat-again  { color: #f97316; font-weight: 700; }
+
+        /* ── MAIN ── */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 480px;
+            padding: 0 24px 40px;
+            margin-top: 100px;
+        }
+
+        /* ── CARD ── */
+        .card-container {
+            perspective: 1200px;
+            width: 100%;
+            height: 260px;
+            cursor: pointer;
+            user-select: none;
+            touch-action: pan-y;
+            margin-bottom: 16px;
+        }
+
+        .card {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: transform;
+        }
+
+        .card.flipped {
+            transform: rotateY(180deg);
+        }
+
+        .card-face {
+            position: absolute;
+            inset: 0;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            border-radius: 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 28px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04);
+        }
+
+        .card-front {
+            background: white;
+        }
+
+        .card-back {
+            background: linear-gradient(145deg, #6366f1, #8b5cf6);
+            transform: rotateY(180deg);
+        }
+
+        .card-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            margin-bottom: 14px;
+        }
+
+        .card-front .card-label { color: #c7d2fe; }
+        .card-back  .card-label { color: rgba(255,255,255,0.55); }
+
+        .card-word {
+            font-size: 40px;
+            font-weight: 800;
+            text-align: center;
+            line-height: 1.1;
+            letter-spacing: -0.5px;
+        }
+
+        .card-front .card-word { color: #1e293b; }
+        .card-back  .card-word { color: white; }
+
+        .card-tap-hint {
+            font-size: 13px;
+            margin-top: 16px;
+        }
+
+        .card-front .card-tap-hint { color: #cbd5e1; }
+        .card-back  .card-tap-hint { color: rgba(255,255,255,0.45); }
+
+        /* ── WORD HISTORY BADGE ── */
+        .word-history {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #94a3b8;
+            background: #f1f5f9;
+            padding: 4px 8px;
+            border-radius: 20px;
+            letter-spacing: 0.02em;
+        }
+        .word-history.good  { background: #dcfce7; color: #16a34a; }
+        .word-history.shaky { background: #fff7ed; color: #ea580c; }
+        .word-history.new   { background: #ede9fe; color: #7c3aed; }
+
+        /* Swipe visual feedback overlay */
+        .swipe-overlay {
+            position: absolute;
+            inset: 0;
+            border-radius: 24px;
+            opacity: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            font-weight: 900;
+            pointer-events: none;
+            transition: opacity 0.1s;
+        }
+
+        .swipe-overlay.known  { background: rgba(34,197,94,0.25);  color: #22c55e; }
+        .swipe-overlay.again  { background: rgba(249,115,22,0.25); color: #f97316; }
+
+        /* ── SWIPE HINT ── */
+        .swipe-hint {
+            font-size: 12px;
+            color: #cbd5e1;
+            text-align: center;
+            letter-spacing: 0.04em;
+            margin-bottom: 24px;
+            min-height: 18px;
+            transition: opacity 0.3s;
+        }
+
+        /* ── BUTTONS ── */
+        .buttons {
+            display: flex;
+            gap: 14px;
+            width: 100%;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 18px 12px;
+            border: none;
+            border-radius: 18px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.12s, opacity 0.12s;
+            letter-spacing: 0.01em;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+            opacity: 0.85;
+        }
+
+        .btn-again {
+            background: #fff4ed;
+            color: #f97316;
+        }
+
+        .btn-known {
+            background: #f0fdf4;
+            color: #22c55e;
+        }
+
+        /* ── COMPLETE SCREEN ── */
+        .complete-screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            width: 100%;
+            max-width: 480px;
+            padding: 60px 24px 40px;
+        }
+
+        .complete-screen.visible { display: flex; }
+
+        .complete-emoji   { font-size: 72px; margin-bottom: 20px; }
+        .complete-title   { font-size: 30px; font-weight: 800; color: #1e293b; margin-bottom: 8px; }
+        .complete-sub     { font-size: 16px; color: #64748b; margin-bottom: 36px; line-height: 1.5; }
+
+        .complete-actions { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+
+        .btn-complete {
+            width: 100%;
+            padding: 18px;
+            border: none;
+            border-radius: 18px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.12s, opacity 0.12s;
+        }
+
+        .btn-complete:active { transform: scale(0.97); opacity: 0.85; }
+        .btn-complete.primary  { background: #6366f1; color: white; }
+        .btn-complete.secondary { background: #e2e8f0; color: #475569; }
+
+        /* ── ANIMATIONS ── */
+        @keyframes cardIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .card-enter { animation: cardIn 0.3s ease; }
+    </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+    <div class="header-title">🇪🇸 Spanish</div>
+    <div class="progress-bar">
+        <div class="progress-fill" id="progressFill" style="width:0%"></div>
+    </div>
+    <div class="stats">
+        <span>Card <strong id="currentNum">1</strong> of <strong id="totalNum">0</strong></span>
+        <span>
+            <span class="stat-known" id="knownCount">0</span> known ·
+            <span class="stat-again" id="againCount">0</span> again
+        </span>
+    </div>
+</div>
+
+<!-- Main flashcard view -->
+<div class="main-content" id="mainContent">
+
+    <div class="card-container" id="cardContainer">
+        <div class="card" id="card">
+            <div class="card-face card-front">
+                <div class="card-label">Spanish</div>
+                <div class="card-word" id="spanishWord">—</div>
+                <div class="card-tap-hint">tap to reveal</div>
+                <div class="word-history new" id="wordHistory">new</div>
+            </div>
+            <div class="card-face card-back">
+                <div class="card-label">English</div>
+                <div class="card-word" id="englishWord">—</div>
+                <div class="card-tap-hint">swipe or use buttons</div>
+                <div class="swipe-overlay known"  id="overlayKnown">✓</div>
+                <div class="swipe-overlay again"  id="overlayAgain">↩</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="swipe-hint" id="swipeHint">← again &nbsp;·&nbsp; tap to flip &nbsp;·&nbsp; known →</div>
+
+    <div class="buttons">
+        <button class="btn btn-again" onclick="markCard(false)">↩ Again</button>
+        <button class="btn btn-known" onclick="markCard(true)">Got it ✓</button>
+    </div>
+
+</div>
+
+<!-- Complete screen -->
+<div class="complete-screen" id="completeScreen">
+    <div class="complete-emoji" id="completeEmoji">🎉</div>
+    <div class="complete-title" id="completeTitle">Round done!</div>
+    <div class="complete-sub"   id="completeSub"></div>
+    <div class="complete-actions">
+        <button class="btn-complete primary"   id="btnReviewMissed" onclick="restartUnknown()">Review missed words</button>
+        <button class="btn-complete secondary" onclick="restartAll()">Start over from scratch</button>
+        <button class="btn-complete secondary" style="color:#ef4444;background:#fff1f2;" onclick="if(confirm('Reset all saved progress?')){clearProgress();restartAll();}">Reset all progress</button>
+    </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  WORD LIST  —  edit this to add your own words!
+//  Format: ["spanish", "english"]
+// ═══════════════════════════════════════════════════════════════
+const wordList = [
+    ["hablar",      "to speak"],
+    ["escuchar",    "to listen"],
+    ["comer",       "to eat"],
+    ["beber",       "to drink"],
+    ["vivir",       "to live"],
+    ["querer",      "to want / to love"],
+    ["poder",       "can / to be able to"],
+    ["tener",       "to have"],
+    ["hacer",       "to do / to make"],
+    ["ir",          "to go"],
+    ["venir",       "to come"],
+    ["saber",       "to know (a fact)"],
+    ["conocer",     "to know (a person/place)"],
+    ["pensar",      "to think"],
+    ["sentir",      "to feel"],
+    ["encontrar",   "to find"],
+    ["llevar",      "to carry / to wear"],
+    ["seguir",      "to follow / to continue"],
+    ["trabajar",    "to work"],
+    ["creer",       "to believe"],
+    ["dejar",       "to leave / to let"],
+    ["llamar",      "to call"],
+    ["poner",       "to put / to place"],
+    ["dar",         "to give"],
+    ["ver",         "to see"],
+    ["quedarse",    "to stay / to remain"],
+    ["pasar",       "to pass / to happen"],
+    ["empezar",     "to begin / to start"],
+    ["volver",      "to return / to come back"],
+    ["necesitar",   "to need"],
+];
+// ═══════════════════════════════════════════════════════════════
+
+let deck       = [];
+let current    = 0;
+let knownCount = 0;
+let againCount = 0;
+let isFlipped  = false;
+
+/* ══════════════════════════════════════════════════════════════
+   PROGRESS STORAGE
+   Saves per-word history to localStorage so it persists between
+   sessions. Each word tracks:
+     seen      — total times shown
+     correct   — total times marked "got it"
+     lastSeen  — timestamp of last review (ready for SRS in Stage 2)
+══════════════════════════════════════════════════════════════ */
+const STORAGE_KEY = 'spanish_flashcards_progress';
+
+function loadProgress() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+    catch { return {}; }
+}
+
+function saveProgress(progress) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); }
+    catch { /* storage full or unavailable */ }
+}
+
+function recordResult(es, wasKnown) {
+    const progress = loadProgress();
+    if (!progress[es]) progress[es] = { seen: 0, correct: 0, lastSeen: null };
+    progress[es].seen++;
+    if (wasKnown) progress[es].correct++;
+    progress[es].lastSeen = Date.now();
+    saveProgress(progress);
+}
+
+function getWordProgress(es) {
+    const progress = loadProgress();
+    return progress[es] || { seen: 0, correct: 0, lastSeen: null };
+}
+
+function clearProgress() {
+    localStorage.removeItem(STORAGE_KEY);
+}
+
+/* ── Helpers ── */
+function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
+/* ── Init ── */
+function init(words) {
+    deck       = shuffle(words.map(w => ({ es: w[0], en: w[1], _known: false })));
+    current    = 0;
+    knownCount = 0;
+    againCount = 0;
+    isFlipped  = false;
+    document.getElementById('card').classList.remove('flipped');
+    showCard();
+}
+
+/* ── Show card ── */
+function showCard() {
+    if (current >= deck.length) { showComplete(); return; }
+
+    const { es, en } = deck[current];
+    document.getElementById('spanishWord').textContent = es;
+    document.getElementById('englishWord').textContent = en;
+
+    // Show word history badge
+    const hist    = getWordProgress(es);
+    const badge   = document.getElementById('wordHistory');
+    if (hist.seen === 0) {
+        badge.textContent = 'new';
+        badge.className   = 'word-history new';
+    } else {
+        const pct = Math.round(hist.correct / hist.seen * 100);
+        badge.textContent = `${hist.correct}/${hist.seen}`;
+        badge.className   = `word-history ${pct >= 70 ? 'good' : 'shaky'}`;
+    }
+
+    isFlipped = false;
+    const card = document.getElementById('card');
+    card.style.transition = 'transform 0.45s cubic-bezier(0.4,0,0.2,1)';
+    card.style.transform  = '';
+    card.style.opacity    = '';
+    card.classList.remove('flipped');
+    setOverlay(0, 'none');
+    updateHeader();
+}
+
+/* ── Header ── */
+function updateHeader() {
+    const total = deck.length;
+    document.getElementById('currentNum').textContent  = Math.min(current + 1, total);
+    document.getElementById('totalNum').textContent    = total;
+    document.getElementById('knownCount').textContent  = knownCount;
+    document.getElementById('againCount').textContent  = againCount;
+    document.getElementById('progressFill').style.width = (current / total * 100) + '%';
+}
+
+/* ── Flip ── */
+function flipCard() {
+    isFlipped = !isFlipped;
+    document.getElementById('card').classList.toggle('flipped', isFlipped);
+    document.getElementById('swipeHint').style.opacity = isFlipped ? '1' : '0.5';
+}
+
+/* ── Mark ── */
+function markCard(wasKnown) {
+    if (!isFlipped) { flipCard(); return; }
+
+    if (wasKnown) { knownCount++; deck[current]._known = true; }
+    else          { againCount++; }
+
+    // Save to localStorage
+    recordResult(deck[current].es, wasKnown);
+
+    current++;
+    // brief pause so user sees the swipe land
+    setTimeout(showCard, 120);
+}
+
+/* ── Swipe overlay tint ── */
+function setOverlay(amount, side) {
+    const ok  = document.getElementById('overlayKnown');
+    const ag  = document.getElementById('overlayAgain');
+    ok.style.opacity = (side === 'known') ? Math.min(amount, 0.85) : 0;
+    ag.style.opacity = (side === 'again') ? Math.min(amount, 0.85) : 0;
+}
+
+/* ── Complete ── */
+function showComplete() {
+    const total  = deck.length;
+    const missed = deck.filter(w => !w._known).length;
+    const pct    = Math.round(knownCount / total * 100);
+
+    document.getElementById('completeEmoji').textContent =
+        pct === 100 ? '🌟' : pct >= 70 ? '🎉' : '💪';
+    document.getElementById('completeTitle').textContent =
+        pct === 100 ? 'Perfect round!' : 'Round complete!';
+    document.getElementById('completeSub').textContent =
+        `You knew ${knownCount} of ${total} words (${pct}%).\n${missed > 0 ? `${missed} word${missed > 1 ? 's' : ''} to review.` : 'Flawless!'}`;
+
+    const btnMissed = document.getElementById('btnReviewMissed');
+    btnMissed.style.display = missed > 0 ? 'block' : 'none';
+
+    document.getElementById('progressFill').style.width = '100%';
+    document.getElementById('mainContent').style.display    = 'none';
+    document.getElementById('completeScreen').classList.add('visible');
+}
+
+function restartUnknown() {
+    const missed = deck.filter(w => !w._known);
+    if (!missed.length) { restartAll(); return; }
+    document.getElementById('completeScreen').classList.remove('visible');
+    document.getElementById('mainContent').style.display = 'flex';
+    init(missed.map(w => [w.es, w.en]));
+}
+
+function restartAll() {
+    document.getElementById('completeScreen').classList.remove('visible');
+    document.getElementById('mainContent').style.display = 'flex';
+    init(wordList);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   TOUCH / SWIPE
+══════════════════════════════════════════════════════════════ */
+let touchStartX = 0;
+let touchStartY = 0;
+let touchDeltaX = 0;
+let dragging    = false;
+const SWIPE_THRESHOLD = 90;
+
+const container = document.getElementById('cardContainer');
+const cardEl    = document.getElementById('card');
+
+container.addEventListener('touchstart', e => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    touchDeltaX = 0;
+    dragging    = false;
+    cardEl.style.transition = 'none';
+}, { passive: true });
+
+container.addEventListener('touchmove', e => {
+    const dx = e.touches[0].clientX - touchStartX;
+    const dy = e.touches[0].clientY - touchStartY;
+
+    // Only hijack horizontal swipes when card is flipped
+    if (!isFlipped) return;
+    if (!dragging && Math.abs(dx) < Math.abs(dy)) return; // vertical scroll
+
+    if (Math.abs(dx) > 6) {
+        dragging    = true;
+        touchDeltaX = dx;
+        const rotate = dx * 0.06;
+        const baseY  = isFlipped ? 180 : 0;
+        cardEl.style.transform = `rotateY(${baseY}deg) translateX(${dx * 0.6}px) rotate(${rotate}deg)`;
+        cardEl.style.opacity   = String(1 - Math.abs(dx) / 320);
+
+        const ratio = Math.min(Math.abs(dx) / SWIPE_THRESHOLD, 1);
+        setOverlay(ratio, dx > 0 ? 'known' : 'again');
+    }
+}, { passive: true });
+
+container.addEventListener('touchend', () => {
+    cardEl.style.transition = 'transform 0.45s cubic-bezier(0.4,0,0.2,1), opacity 0.2s';
+
+    if (dragging && isFlipped && Math.abs(touchDeltaX) >= SWIPE_THRESHOLD) {
+        markCard(touchDeltaX > 0);
+    } else {
+        // snap back
+        cardEl.style.transform = isFlipped ? 'rotateY(180deg)' : '';
+        cardEl.style.opacity   = '1';
+        setOverlay(0, 'none');
+        if (!dragging) flipCard();
+    }
+    dragging = false;
+});
+
+/* Desktop click-to-flip */
+cardEl.addEventListener('click', () => { if (!dragging) flipCard(); });
+
+/* ── Keyboard shortcuts (desktop bonus) ── */
+document.addEventListener('keydown', e => {
+    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flipCard(); }
+    if (e.key === 'ArrowRight') markCard(true);
+    if (e.key === 'ArrowLeft')  markCard(false);
+});
+
+/* ── Go! ── */
+init(wordList);
+</script>
+</body>
+</html>
